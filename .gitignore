@@ -32,11 +32,6 @@ auth_info_baileys/
 *.lock
 # Consider ignoring other sensitive or large local files if any
 
-# Ignore package-lock.json if using npm, or yarn.lock if using yarn
-# Assuming npm, so package-lock.json will be ignored. If you use yarn, uncomment the next line.
-# yarn.lock
-package-lock.json
-
 # Ignore any other temporary or generated files
 temp/
 *.tmp
