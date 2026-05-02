@@ -21,6 +21,25 @@ const RANGE = 'tabla_clientes_wp!A2';
 const CREDENTIALS_PATH = path.join(__dirname, 'credentials.json');
 const LID_MAP_PATH = path.join(__dirname, 'lid_map.json');
 
+const http = require('http');
+
+// --- HTTP Server for Health Check ---
+const PORT = process.env.PORT || 8000; // Use env var PORT or default to 8000
+
+const server = http.createServer((req, res) => {
+    if (req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('OK');
+    } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
+    }
+});
+
+server.listen(PORT, () => {
+    console.log(`🚀 Health check server running on port ${PORT}`);
+});
+
 const autoResponseService = new AutoResponseService(SPREADSHEET_ID, CREDENTIALS_PATH);
 
 // --- PERSISTENCIA LID ---
