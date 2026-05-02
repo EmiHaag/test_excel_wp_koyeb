@@ -132,18 +132,16 @@ server.listen(PORT, '0.0.0.0', () => {
 const autoResponseService = new AutoResponseService(SPREADSHEET_ID, CREDENTIALS_PATH);
 
 
-async function startSock() {
-    // 1. Inicializamos el sistema de autenticación por archivos
-    // Esto creará una carpeta llamada 'auth_info' donde se guardará la sesión
+async function createSocket() {
     const {
         state,
         saveCreds
-    } = await useMultiFileAuthState('auth_info');
+    } = await useMultiFileAuthState(AUTH_DIR);
 
     const sock = makeWASocket({
         auth: state,
         printQRInTerminal: false,
-        browser: ['Chrome', 'Chrome', '120.0.0.0'],
+        browser: ['Windows', 'Chrome', '120.0.0.0'],
         connectTimeoutMs: 90000,
         defaultQueryTimeoutMs: 60000,
         keepAliveIntervalMs: 25000,
@@ -154,43 +152,7 @@ async function startSock() {
         retryRequestDelayMs: 250
     });
 
-    // 2. Guardamos las credenciales cada vez que cambien
     sock.ev.on('creds.update', saveCreds);
-
-    // 3. Manejador de conexión
-    sock.ev.on('connection.update', async (update) => {
-        const {
-            connection,
-            lastDisconnect,
-            qr
-        } = update;
-
-        if (qr) {
-            global.latestQR = qr;
-            console.log('📶 Nuevo QR detectado y guardado en memoria.');
-        }
-
-        if (connection === 'close') {
-            const statusCode = (lastDisconnect.error)?.output?.statusCode;
-            console.log('⚠️ Conexión cerrada. Motivo:', lastDisconnect.error);
-
-            // Si no es un cierre de sesión explícito, reconectamos
-            if (statusCode !== DisconnectReason.loggedOut) {
-                setTimeout(() => {
-                    startSock();
-                }, 5000); // Espera 5 segundos antes de reintentar
-            } else {
-                console.log('❌ Sesión cerrada. Escanea el código nuevamente.');
-                global.latestQR = null;
-            }
-        } else if (connection === 'open') {
-            console.log('🟢 ¡Conexión establecida y guardada!');
-            global.latestQR = null;
-        } else if (connection === 'connecting') {
-            console.log('⏳ Intentando conectar...');
-        }
-    });
-
     return sock;
 }
 
@@ -338,19 +300,8 @@ async function startWhatsApp() {
             state,
             saveCreds
         } = await useMultiFileAuthState(AUTH_DIR);
-        const {
-            version
-        } = await fetchLatestBaileysVersion();
-        console.log(`✅ Baileys version: ${version.version}`);
-
-        const sock = makeWASocket({
-            auth: state,
-            printQRInTerminal: false,
-            browser: ['WhatsApp Bot', 'Chrome', '1.0.0'], // Configuración estándar
-            connectTimeoutMs: 60000,
-            defaultQueryTimeoutMs: 60000
-        });
-        console.log('✅ Socket de WhatsApp creado');
+        const sock = await createSocket();
+        console.log('✅ Socket de WhatsApp creado con configuración optimizada');
 
         let hasRequestedCode = false; // Bandera para pedir el código una sola vez
 
