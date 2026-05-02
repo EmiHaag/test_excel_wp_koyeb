@@ -20,11 +20,12 @@ const SPREADSHEET_ID = '11pp2Hna3pWmBK5t82m9ymIFPce-aD3HZmI00pgaLEDo';
 const RANGE = 'tabla_clientes_wp!A2';
 const CREDENTIALS_PATH = path.join(__dirname, 'credentials.json');
 const LID_MAP_PATH = path.join(__dirname, 'lid_map.json');
+const AUTH_DIR = path.join(__dirname, 'auth_info'); // Adaptado para el volumen
 
 const http = require('http');
 
 // --- HTTP Server for Health Check ---
-const PORT = process.env.PORT || 8000; // Use env var PORT or default to 8000
+const PORT = process.env.PORT || 8000;
 
 const server = http.createServer((req, res) => {
     if (req.url === '/health') {
@@ -133,6 +134,7 @@ async function syncToSheet({
             await sheets.spreadsheets.values.update({
                 spreadsheetId: SPREADSHEET_ID,
                 range: `tabla_clientes_wp!A${realRow}:D${realRow}`,
+                valueInputOption: 'USER_ENTERED', // Corregido el nombre del parámetro si es necesario, o déjalo como valueInputOption
                 valueInputOption: 'USER_ENTERED',
                 resource: {
                     values: [
@@ -167,10 +169,17 @@ async function startWhatsApp() {
     console.log(`📂 Credenciales: ${CREDENTIALS_PATH}`);
 
     try {
+        // Aseguramos que utilice la carpeta montada al volumen
+        if (!fs.existsSync(AUTH_DIR)) {
+            fs.mkdirSync(AUTH_DIR, {
+                recursive: true
+            });
+        }
+
         const {
             state,
             saveCreds
-        } = await useMultiFileAuthState('auth_info_baileys');
+        } = await useMultiFileAuthState(AUTH_DIR);
         const {
             version
         } = await fetchLatestBaileysVersion();
@@ -195,11 +204,15 @@ async function startWhatsApp() {
                 lastDisconnect,
                 qr
             } = update;
-            // --- NUEVA LÓGICA PARA EL PAIRING CODE ---
+
+            // --- NUEVA LÓGICA CON RETRASO ---
             if (!sock.authState.creds.registered && !hasRequestedCode) {
-                hasRequestedCode = true; // Marcamos como solicitado
-                // Reemplaza con tu número de WhatsApp completo (ej. 549...)
-                const phoneNumber = process.env.WHATSAPP_PHONE_NUMBER; // Use env var or placeholder
+                hasRequestedCode = true;
+
+                // Retrasamos 5 segundos la solicitud para estabilizar el socket
+                await new Promise(resolve => setTimeout(resolve, 5000));
+
+                const phoneNumber = process.env.WHATSAPP_PHONE_NUMBER;
                 try {
                     console.log('Solicitando código de emparejamiento...');
                     const code = await sock.requestPairingCode(phoneNumber);
@@ -207,16 +220,22 @@ async function startWhatsApp() {
                     console.log('Ve a WhatsApp > Dispositivos vinculados > Vincular con el número de teléfono e introduce este código.');
                 } catch (error) {
                     console.error('Error al solicitar el código de emparejamiento:', error);
+                    hasRequestedCode = false; // Si falla, permitimos reintentar
                 }
             }
 
             if (connection === 'close') {
+                hasRequestedCode = false; // Reiniciamos la bandera
                 console.log(`❌ Conexión cerrada. Status: ${lastDisconnect.error?.output?.statusCode}`);
+
                 const shouldReconnect = (lastDisconnect.error instanceof Boom) ?
                     lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut : true;
+
                 if (shouldReconnect) {
-                    console.log('🔄 Reintentando conexión en 3 segundos...');
-                    setTimeout(() => startWhatsApp(), 3000);
+                    console.log('🔄 Reintentando conexión en 5 segundos...');
+                    setTimeout(() => startWhatsApp(), 5000);
+                } else {
+                    console.log('⚠️ Sesión cerrada. Elimina y vuelve a vincular el dispositivo.');
                 }
             } else if (connection === 'open') {
                 console.log('✅ Conexión Exitosa - Bot activo');
@@ -228,13 +247,11 @@ async function startWhatsApp() {
             saveCreds();
         });
 
-        // --- INTERCEPTOR DE NODOS CRUDOS (Estrategia GitHub) ---
+        // --- INTERCEPTOR DE NODOS CRUDOS ---
         sock.ws.on('CB:message', (node) => {
             const from = node.attrs.from;
             if (from && from.endsWith('@lid')) {
                 console.log(`DEBUG [CB:message] Atributos del nodo:`, JSON.stringify(node.attrs, null, 2));
-
-                // Intentar buscar el PN en todos los atributos posibles
                 const potentialPn = node.attrs.actual_pn || node.attrs.sender_pn || node.attrs.phash || node.attrs.pn;
 
                 if (potentialPn) {
