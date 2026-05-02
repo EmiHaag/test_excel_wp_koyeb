@@ -141,11 +141,15 @@ async function startSock() {
     } = await useMultiFileAuthState('auth_info');
 
     const sock = makeWASocket({
-        auth: state, // Pasamos el estado de autenticación
-        printQRInTerminal: false, // Desactivamos la consola para usar la web
-        browser: ['WhatsApp Bot', 'Chrome', '1.0.0'],
+        auth: state,
+        printQRInTerminal: false,
+        browser: ['Ubuntu', 'Chrome', '121.0.0.0'],
         connectTimeoutMs: 60000,
-        defaultQueryTimeoutMs: 60000
+        defaultQueryTimeoutMs: 60000,
+        keepAliveIntervalMs: 30000,
+        emitOwnEventsFlag: true,
+        shouldIgnoreJidEndingSemicolon: false,
+        logger: require('pino')({ level: 'error' })
     });
 
     // 2. Guardamos las credenciales cada vez que cambien
