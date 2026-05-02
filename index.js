@@ -143,13 +143,13 @@ async function startSock() {
     const sock = makeWASocket({
         auth: state,
         printQRInTerminal: false,
-        browser: ['Ubuntu', 'Chrome', '121.0.0.0'],
-        connectTimeoutMs: 60000,
+        browser: ['Chrome', 'Chrome', '120.0.0.0'],
+        connectTimeoutMs: 90000,
         defaultQueryTimeoutMs: 60000,
-        keepAliveIntervalMs: 30000,
-        emitOwnEventsFlag: true,
-        shouldIgnoreJidEndingSemicolon: false,
-        logger: require('pino')({ level: 'error' })
+        keepAliveIntervalMs: 25000,
+        logger: require('pino')({ level: 'error' }),
+        qrTimeout: 60000,
+        retryRequestDelayMs: 250
     });
 
     // 2. Guardamos las credenciales cada vez que cambien
