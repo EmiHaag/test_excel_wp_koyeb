@@ -205,12 +205,13 @@ async function startWhatsApp() {
                 qr
             } = update;
 
-            // --- NUEVA LÓGICA CON RETRASO ---
+            // --- LÓGICA AMPLIADA PARA EL PAIRING CODE ---
             if (!sock.authState.creds.registered && !hasRequestedCode) {
                 hasRequestedCode = true;
 
-                // Retrasamos 5 segundos la solicitud para estabilizar el socket
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                // Aumentamos la espera a 10 segundos para dar tiempo a que la red se estabilice
+                console.log('⏳ Esperando 10 segundos para estabilizar la conexión antes de solicitar el código...');
+                await new Promise(resolve => setTimeout(resolve, 10000));
 
                 const phoneNumber = process.env.WHATSAPP_PHONE_NUMBER;
                 try {
@@ -232,8 +233,8 @@ async function startWhatsApp() {
                     lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut : true;
 
                 if (shouldReconnect) {
-                    console.log('🔄 Reintentando conexión en 5 segundos...');
-                    setTimeout(() => startWhatsApp(), 5000);
+                    console.log('🔄 Reintentando conexión en 10 segundos...');
+                    setTimeout(() => startWhatsApp(), 10000);
                 } else {
                     console.log('⚠️ Sesión cerrada. Elimina y vuelve a vincular el dispositivo.');
                 }
