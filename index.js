@@ -320,19 +320,6 @@ async function startWhatsApp() {
             if (connection === 'open') {
                 console.log('🟢 ¡Conexión establecida exitosamente!');
                 global.latestQR = null;
-
-                if (!sock.authState.creds.registered && !hasRequestedCode) {
-                    hasRequestedCode = true;
-                    const phoneNumber = process.env.WHATSAPP_PHONE_NUMBER;
-                    try {
-                        console.log('Solicitando código de emparejamiento...');
-                        const code = await sock.requestPairingCode(phoneNumber);
-                        console.log(`\n🔑 CÓDIGO DE VINCULACIÓN: ${code}\n`);
-                    } catch (error) {
-                        console.error('Error al solicitar código:', error);
-                        hasRequestedCode = false;
-                    }
-                }
             } else if (connection === 'close') {
                 const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
                 console.log('⚠️ Conexión cerrada. Motivo:', lastDisconnect.error);
