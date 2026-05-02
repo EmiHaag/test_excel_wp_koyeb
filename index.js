@@ -28,7 +28,10 @@ const http = require('http');
 const PORT = process.env.PORT || 8000;
 
 const server = http.createServer((req, res) => {
-    if (req.url === '/health') {
+    // Normalizamos la URL eliminando la barra final y los parámetros de consulta
+    const urlPath = req.url.split('?')[0].replace(/\/+$/, '');
+
+    if (urlPath === '/health') {
         res.writeHead(200, {
             'Content-Type': 'text/plain'
         });
