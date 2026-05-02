@@ -25,7 +25,7 @@ const AUTH_DIR = path.join(__dirname, 'auth_info'); // Adaptado para el volumen
 
 const http = require('http');
 
-let latestQR = null; // Variable global para guardar el QR temporalmente en memoria
+global.latestQR = null; // Variable global para guardar el QR temporalmente en memoria
 
 // --- HTTP Server for Health Check y Web QR ---
 const PORT = process.env.PORT || 8000;
@@ -34,7 +34,7 @@ const server = http.createServer(async (req, res) => {
     // Normalizamos la URL usando el host de la petición
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
     let pathname = parsedUrl.pathname;
-    console.log("pathname: " + pathname)
+
 
     // Removemos la barra diagonal al final si existe (ej: /health/ -> /health)
     if (pathname.endsWith('/') && pathname.length > 1) {
@@ -47,9 +47,9 @@ const server = http.createServer(async (req, res) => {
         });
         res.end('OK');
     } else if (pathname === '/qr') {
-        if (typeof latestQR !== 'undefined' && latestQR) {
+        if (typeof global.latestQR !== 'undefined' && global.latestQR) {
             try {
-                const qrImage = await QRCode.toDataURL(latestQR);
+                const qrImage = await QRCode.toDataURL(global.latestQR);
 
                 res.writeHead(200, {
                     'Content-Type': 'text/html'
@@ -300,7 +300,7 @@ async function startWhatsApp() {
 
             // --- LÓGICA DEL CÓDIGO QR WEB ---
             if (qr) {
-                latestQR = qr;
+                global.latestQR = qr;
                 console.log('📶 Nuevo código QR detectado y guardado en memoria.');
             }
 
@@ -325,21 +325,20 @@ async function startWhatsApp() {
             }
 
             if (connection === 'close') {
-                hasRequestedCode = false; // Reiniciamos la bandera
-                console.log(`❌ Conexión cerrada. Status: ${lastDisconnect.error?.output?.statusCode}`);
+                // Obtenemos la razón de la desconexión
+                const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+                console.log('⚠️ Conexión cerrada. Motivo:', lastDisconnect.error);
 
-                const shouldReconnect = (lastDisconnect.error instanceof Boom) ?
-                    lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut : true;
-
+                // Si no es un cierre de sesión definitivo, reconectamos el bot
                 if (shouldReconnect) {
-                    console.log('🔄 Reintentando conexión en 10 segundos...');
-                    setTimeout(() => startWhatsApp(), 10000);
-                } else {
-                    console.log('⚠️ Sesión cerrada. Se reiniciará el proceso para generar una nueva vinculación.');
-                    setTimeout(() => startWhatsApp(), 5000);
+                    startSock(); // Llama a tu función principal de inicio aquí
                 }
             } else if (connection === 'open') {
-                console.log('✅ Conexión Exitosa - Bot activo');
+                console.log('🟢 ¡Conexión establecida exitosamente!');
+                // Limpiamos el QR en memoria para que no sea accesible una vez vinculado
+                global.latestQR = null;
+            } else if (connection === 'connecting') {
+                console.log('⏳ El bot está intentando conectar con WhatsApp...');
             }
         });
 
