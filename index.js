@@ -11,6 +11,7 @@ const {
     google
 } = require('googleapis');
 const qrcode = require('qrcode-terminal');
+const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 const AutoResponseService = require('./autoResponse');
@@ -24,10 +25,12 @@ const AUTH_DIR = path.join(__dirname, 'auth_info'); // Adaptado para el volumen
 
 const http = require('http');
 
-// --- HTTP Server for Health Check ---
+let latestQR = null; // Variable global para guardar el QR temporalmente en memoria
+
+// --- HTTP Server for Health Check y Web QR ---
 const PORT = process.env.PORT || 8000;
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
     // Normalizamos la URL eliminando la barra final y los parámetros de consulta
     const urlPath = req.url.split('?')[0].replace(/\/+$/, '');
 
@@ -36,6 +39,77 @@ const server = http.createServer((req, res) => {
             'Content-Type': 'text/plain'
         });
         res.end('OK');
+    } else if (urlPath === '/qr') {
+        if (latestQR) {
+            try {
+                const qrImage = await QRCode.toDataURL(latestQR);
+
+                res.writeHead(200, {
+                    'Content-Type': 'text/html'
+                });
+                res.end(`
+                    <!DOCTYPE html>
+                    <html lang="es">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Vincular WhatsApp</title>
+                        <style>
+                            body {
+                                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                                background-color: #111827;
+                                color: #ffffff;
+                                display: flex;
+                                flex-direction: column;
+                                align-items: center;
+                                justify-content: center;
+                                height: 100vh;
+                                margin: 0;
+                            }
+                            .card {
+                                background-color: #1f2937;
+                                padding: 2.5rem;
+                                border-radius: 0.75rem;
+                                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+                                text-align: center;
+                            }
+                            img {
+                                background: white;
+                                padding: 1rem;
+                                border-radius: 0.5rem;
+                            }
+                            h2 { margin-bottom: 0.5rem; color: #10b981; }
+                            p { color: #9ca3af; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="card">
+                            <h2>Escanea el código QR</h2>
+                            <p>Usa la cámara de tu WhatsApp para vincular</p>
+                            <br>
+                            <img src="${qrImage}" alt="QR Code de WhatsApp" width="250" height="250">
+                        </div>
+                    </body>
+                    </html>
+                `);
+            } catch (error) {
+                res.writeHead(500, {
+                    'Content-Type': 'text/plain'
+                });
+                res.end('Error interno al generar la imagen QR.');
+            }
+        } else {
+            res.writeHead(404, {
+                'Content-Type': 'text/html'
+            });
+            res.end(`
+                <html lang="es">
+                <body style="background:#111827;color:#fff;font-family:sans-serif;text-align:center;padding-top:20%;">
+                    <h2>Aún no hay código QR disponible</h2>
+                    <p>Espera unos segundos y refresca la página o reinicia el bot.</p>
+                </body>
+                </html>
+            `);
+        }
     } else {
         res.writeHead(404, {
             'Content-Type': 'text/plain'
@@ -45,7 +119,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-    console.log(`🚀 Health check server running on port ${PORT}`);
+    console.log(`🚀 Health check y Web QR server running on port ${PORT}`);
 });
 
 const autoResponseService = new AutoResponseService(SPREADSHEET_ID, CREDENTIALS_PATH);
@@ -66,7 +140,7 @@ function saveLidMap(map) {
     fs.writeFileSync(LID_MAP_PATH, JSON.stringify(map, null, 2));
 }
 
-let lidMap = loadLidMap();
+let lidMap = loadLMap();
 
 // --- UTILIDADES ---
 function sanitizeText(text) {
@@ -137,7 +211,6 @@ async function syncToSheet({
             await sheets.spreadsheets.values.update({
                 spreadsheetId: SPREADSHEET_ID,
                 range: `tabla_clientes_wp!A${realRow}:D${realRow}`,
-                valueInputOption: 'USER_ENTERED', // Corregido el nombre del parámetro si es necesario, o déjalo como valueInputOption
                 valueInputOption: 'USER_ENTERED',
                 resource: {
                     values: [
@@ -217,6 +290,12 @@ async function startWhatsApp() {
                 lastDisconnect,
                 qr
             } = update;
+
+            // --- LÓGICA DEL CÓDIGO QR WEB ---
+            if (qr) {
+                latestQR = qr;
+                console.log('📶 Nuevo código QR detectado y guardado en memoria.');
+            }
 
             // --- LÓGICA AMPLIADA PARA EL PAIRING CODE ---
             if (!sock.authState.creds.registered && !hasRequestedCode) {
