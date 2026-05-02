@@ -28,10 +28,14 @@ const PORT = process.env.PORT || 8000; // Use env var PORT or default to 8000
 
 const server = http.createServer((req, res) => {
     if (req.url === '/health') {
-        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.writeHead(200, {
+            'Content-Type': 'text/plain'
+        });
         res.end('OK');
     } else {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.writeHead(404, {
+            'Content-Type': 'text/plain'
+        });
         res.end('Not Found');
     }
 });
@@ -85,13 +89,13 @@ async function syncToSheet({
 }) {
     try {
         const credentialsJson = process.env.CREDENTIALS_JSON;
-if (!credentialsJson) {
-    throw new Error("CREDENTIALS_JSON environment variable not set. Please provide Google Cloud credentials.");
-}
-const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(credentialsJson),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-});
+        if (!credentialsJson) {
+            throw new Error("CREDENTIALS_JSON environment variable not set. Please provide Google Cloud credentials.");
+        }
+        const auth = new google.auth.GoogleAuth({
+            credentials: JSON.parse(credentialsJson),
+            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        });
         const sheets = google.sheets({
             version: 'v4',
             auth
@@ -175,7 +179,7 @@ async function startWhatsApp() {
         const sock = makeWASocket({
             version,
             auth: state,
-            //printQRInTerminal: true,
+            printQRInTerminal: false,
             browser: ['Windows', 'Chrome', '110.0.5481.178'],
             logger: require('pino')({
                 level: 'error'
@@ -189,12 +193,20 @@ async function startWhatsApp() {
                 lastDisconnect,
                 qr
             } = update;
-            if (qr) {
-                console.log('📱 Escanea el código QR con WhatsApp:');
-                qrcode.generate(qr, {
-                    small: true
-                });
+            // --- NUEVA LÓGICA PARA EL PAIRING CODE ---
+            if (!sock.authState.creds.registered) {
+                // Reemplaza con tu número de WhatsApp completo (ej. 549...)
+                const phoneNumber = process.env.WHATSAPP_PHONE_NUMBER || '549...'; // Use env var or placeholder
+                try {
+                    console.log('Solicitando código de emparejamiento...');
+                    const code = await sock.requestPairingCode(phoneNumber);
+                    console.log(`\n🔑 CÓDIGO DE VINCULACIÓN DE WHATSAPP: ${code}\n`);
+                    console.log('Ve a WhatsApp > Dispositivos vinculados > Vincular con el número de teléfono e introduce este código.');
+                } catch (error) {
+                    console.error('Error al solicitar el código de emparejamiento:', error);
+                }
             }
+
             if (connection === 'close') {
                 console.log(`❌ Conexión cerrada. Status: ${lastDisconnect.error?.output?.statusCode}`);
                 const shouldReconnect = (lastDisconnect.error instanceof Boom) ?
