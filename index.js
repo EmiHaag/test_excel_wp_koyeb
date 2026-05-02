@@ -140,7 +140,7 @@ function saveLidMap(map) {
     fs.writeFileSync(LID_MAP_PATH, JSON.stringify(map, null, 2));
 }
 
-let lidMap = loadLMap();
+let lidMap = loadLidMap();
 
 // --- UTILIDADES ---
 function sanitizeText(text) {
