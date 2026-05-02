@@ -312,45 +312,33 @@ async function startWhatsApp() {
                 qr
             } = update;
 
-            // --- LÓGICA DEL CÓDIGO QR WEB ---
             if (qr) {
                 global.latestQR = qr;
                 console.log('📶 Nuevo código QR detectado y guardado en memoria.');
             }
 
-            // --- LÓGICA AMPLIADA PARA EL PAIRING CODE ---
-            if (!sock.authState.creds.registered && !hasRequestedCode) {
-                hasRequestedCode = true;
+            if (connection === 'open') {
+                console.log('🟢 ¡Conexión establecida exitosamente!');
+                global.latestQR = null;
 
-                // Aumentamos la espera a 10 segundos para dar tiempo a que la red se estabilice
-                console.log('⏳ Esperando 10 segundos para estabilizar la conexión antes de solicitar el código...');
-                await new Promise(resolve => setTimeout(resolve, 10000));
-
-                const phoneNumber = process.env.WHATSAPP_PHONE_NUMBER;
-                try {
-                    console.log('Solicitando código de emparejamiento...');
-                    const code = await sock.requestPairingCode(phoneNumber);
-                    console.log(`\n🔑 CÓDIGO DE VINCULACIÓN DE WHATSAPP: ${code}\n`);
-                    console.log('Ve a WhatsApp > Dispositivos vinculados > Vincular con el número de teléfono e introduce este código.');
-                } catch (error) {
-                    console.error('Error al solicitar el código de emparejamiento:', error);
-                    hasRequestedCode = false; // Si falla, permitimos reintentar
+                if (!sock.authState.creds.registered && !hasRequestedCode) {
+                    hasRequestedCode = true;
+                    const phoneNumber = process.env.WHATSAPP_PHONE_NUMBER;
+                    try {
+                        console.log('Solicitando código de emparejamiento...');
+                        const code = await sock.requestPairingCode(phoneNumber);
+                        console.log(`\n🔑 CÓDIGO DE VINCULACIÓN: ${code}\n`);
+                    } catch (error) {
+                        console.error('Error al solicitar código:', error);
+                        hasRequestedCode = false;
+                    }
                 }
-            }
-
-            if (connection === 'close') {
-                // Obtenemos la razón de la desconexión
+            } else if (connection === 'close') {
                 const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
                 console.log('⚠️ Conexión cerrada. Motivo:', lastDisconnect.error);
-
-                // Si no es un cierre de sesión definitivo, reconectamos el bot
                 if (shouldReconnect) {
                     setTimeout(() => startWhatsApp(), 5000);
                 }
-            } else if (connection === 'open') {
-                console.log('🟢 ¡Conexión establecida exitosamente!');
-                // Limpiamos el QR en memoria para que no sea accesible una vez vinculado
-                global.latestQR = null;
             } else if (connection === 'connecting') {
                 console.log('⏳ El bot está intentando conectar con WhatsApp...');
             }
