@@ -345,7 +345,7 @@ async function startWhatsApp() {
 
                 // Si no es un cierre de sesión definitivo, reconectamos el bot
                 if (shouldReconnect) {
-                    startSock(); // Llama a tu función principal de inicio aquí
+                    setTimeout(() => startWhatsApp(), 5000);
                 }
             } else if (connection === 'open') {
                 console.log('🟢 ¡Conexión establecida exitosamente!');
