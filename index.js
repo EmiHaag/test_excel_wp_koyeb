@@ -34,6 +34,7 @@ const server = http.createServer(async (req, res) => {
     // Normalizamos la URL usando el host de la petición
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
     let pathname = parsedUrl.pathname;
+    console.log("pathname: " + pathname)
 
     // Removemos la barra diagonal al final si existe (ej: /health/ -> /health)
     if (pathname.endsWith('/') && pathname.length > 1) {
