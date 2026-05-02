@@ -147,7 +147,9 @@ async function startSock() {
         connectTimeoutMs: 90000,
         defaultQueryTimeoutMs: 60000,
         keepAliveIntervalMs: 25000,
-        logger: require('pino')({ level: 'error' }),
+        logger: require('pino')({
+            level: 'error'
+        }),
         qrTimeout: 60000,
         retryRequestDelayMs: 250
     });
@@ -322,7 +324,7 @@ async function startWhatsApp() {
                 recursive: true,
                 force: true
             });
-            console.log('🧹 Carpeta de sesión anterior eliminada.');
+            console.log('🧹 Carpeta de sesión eliminada por inconsistencias en el handshake.');
         }
 
         // Aseguramos que el directorio esté creado y vacío
@@ -342,13 +344,11 @@ async function startWhatsApp() {
         console.log(`✅ Baileys version: ${version.version}`);
 
         const sock = makeWASocket({
-            version,
             auth: state,
             printQRInTerminal: false,
-            browser: ['Windows', 'Chrome', '110.0.5481.178'],
-            logger: require('pino')({
-                level: 'error'
-            })
+            browser: ['WhatsApp Bot', 'Chrome', '1.0.0'], // Configuración estándar
+            connectTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 60000
         });
         console.log('✅ Socket de WhatsApp creado');
 
