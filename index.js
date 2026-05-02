@@ -187,16 +187,19 @@ async function startWhatsApp() {
         });
         console.log('✅ Socket de WhatsApp creado');
 
-        sock.ev.on('connection.update', (update) => {
+        let hasRequestedCode = false; // Bandera para pedir el código una sola vez
+
+        sock.ev.on('connection.update', async (update) => {
             const {
                 connection,
                 lastDisconnect,
                 qr
             } = update;
             // --- NUEVA LÓGICA PARA EL PAIRING CODE ---
-            if (!sock.authState.creds.registered) {
+            if (!sock.authState.creds.registered && !hasRequestedCode) {
+                hasRequestedCode = true; // Marcamos como solicitado
                 // Reemplaza con tu número de WhatsApp completo (ej. 549...)
-                const phoneNumber = process.env.WHATSAPP_PHONE_NUMBER || '549...'; // Use env var or placeholder
+                const phoneNumber = process.env.WHATSAPP_PHONE_NUMBER; // Use env var or placeholder
                 try {
                     console.log('Solicitando código de emparejamiento...');
                     const code = await sock.requestPairingCode(phoneNumber);
