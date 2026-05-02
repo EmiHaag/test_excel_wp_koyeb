@@ -33,15 +33,20 @@ const PORT = process.env.PORT || 8000;
 const server = http.createServer(async (req, res) => {
     // Normalizamos la URL usando el host de la petición
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
-    const urlPath = parsedUrl.pathname.replace(/\/+$/, ''); // Remueve barras al final si existen
+    let pathname = parsedUrl.pathname;
 
-    if (urlPath === '/health') {
+    // Removemos la barra diagonal al final si existe (ej: /health/ -> /health)
+    if (pathname.endsWith('/') && pathname.length > 1) {
+        pathname = pathname.slice(0, -1);
+    }
+
+    if (pathname === '/health') {
         res.writeHead(200, {
             'Content-Type': 'text/plain'
         });
         res.end('OK');
-    } else if (urlPath === '/qr') {
-        if (latestQR) {
+    } else if (pathname === '/qr') {
+        if (typeof latestQR !== 'undefined' && latestQR) {
             try {
                 const qrImage = await QRCode.toDataURL(latestQR);
 
