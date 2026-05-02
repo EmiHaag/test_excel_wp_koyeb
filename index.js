@@ -172,7 +172,17 @@ async function startWhatsApp() {
     console.log(`📂 Credenciales: ${CREDENTIALS_PATH}`);
 
     try {
-        // Aseguramos que utilice la carpeta montada al volumen
+        // --- LIMPIEZA DE SESIÓN (Plan eMicro) ---
+        // Eliminamos el directorio de sesión al arrancar para forzar una nueva vinculación
+        if (fs.existsSync(AUTH_DIR)) {
+            fs.rmSync(AUTH_DIR, {
+                recursive: true,
+                force: true
+            });
+            console.log('🧹 Carpeta de sesión anterior eliminada.');
+        }
+
+        // Aseguramos que el directorio esté creado y vacío
         if (!fs.existsSync(AUTH_DIR)) {
             fs.mkdirSync(AUTH_DIR, {
                 recursive: true
@@ -239,7 +249,8 @@ async function startWhatsApp() {
                     console.log('🔄 Reintentando conexión en 10 segundos...');
                     setTimeout(() => startWhatsApp(), 10000);
                 } else {
-                    console.log('⚠️ Sesión cerrada. Elimina y vuelve a vincular el dispositivo.');
+                    console.log('⚠️ Sesión cerrada. Se reiniciará el proceso para generar una nueva vinculación.');
+                    setTimeout(() => startWhatsApp(), 5000);
                 }
             } else if (connection === 'open') {
                 console.log('✅ Conexión Exitosa - Bot activo');
