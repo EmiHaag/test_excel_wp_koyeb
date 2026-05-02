@@ -31,8 +31,9 @@ let latestQR = null; // Variable global para guardar el QR temporalmente en memo
 const PORT = process.env.PORT || 8000;
 
 const server = http.createServer(async (req, res) => {
-    // Normalizamos la URL eliminando la barra final y los parámetros de consulta
-    const urlPath = req.url.split('?')[0].replace(/\/+$/, '');
+    // Normalizamos la URL usando el host de la petición
+    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+    const urlPath = parsedUrl.pathname.replace(/\/+$/, ''); // Remueve barras al final si existen
 
     if (urlPath === '/health') {
         res.writeHead(200, {
