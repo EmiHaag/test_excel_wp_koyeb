@@ -1,0 +1,34 @@
+# Ignore development dependencies, logs, and other non-essential files
+
+# Dependencies
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Build output
+dist/
+build/
+
+# Environment variables
+.env
+.env.*
+
+# Editor directories and files
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Specific files to ignore in this project
+credentials.json
+lid_map.json
+auth_info_baileys/
+*.lock

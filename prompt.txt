@@ -1,0 +1,16 @@
+Actúa como un desarrollador backend experto en Node.js y en la automatización de flujos de trabajo. 
+
+Por favor, escribe el código completo de un módulo en Node.js que capture mensajes de WhatsApp utilizando la librería Baileys y los registre automáticamente en una hoja de cálculo de Google Sheets.
+
+Requisitos técnicos del código:
+
+1. Inicialización y Evento: Escuchar el evento `messages.upsert` de Baileys. Filtrar los mensajes para procesar solo los entrantes de usuarios (ignorar mensajes del propio bot).
+2. Extracción de Datos:
+   - Obtener el nombre del remitente (`pushName`).
+   - Extraer y limpiar el número de teléfono (separar el JID del sufijo @s.whatsapp.net).
+   - Extraer el texto del mensaje (manejar tanto `conversation` como `extendedTextMessage`).
+   - Convertir el timestamp del mensaje a formato de fecha legible (YYYY-MM-DD HH:MM:SS).
+3. Sanitización: Limpiar emojis o caracteres especiales del texto para evitar errores en Google Sheets.
+4. Integración con Google Sheets: Usar la librería `googleapis` con autenticación por `Service Account`. Incluir la función que añade los datos mediante `spreadsheets.values.append` en un rango dado.
+
+Proporciona el código modular, incluyendo las importaciones necesarias y comentando los puntos donde debo reemplazar los identificadores (como el ID del spreadsheet y la ruta al archivo JSON de credenciales).
