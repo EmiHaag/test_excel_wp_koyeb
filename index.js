@@ -18,7 +18,7 @@ const fs = require('fs');
 const AutoResponseService = require('./autoResponse');
 
 // --- CONFIGURACIÓN ---
-const SPREADSHEET_ID = '11pp2Hna3pWmBK5t82m9ymIFPce-aD3HZmI00pgaLEDo';
+const SPREADSHEET_ID = process.env.SHEET_ID || '1Xo9n8sKj3l2Zt7vVh5gY8a9b0cD1eF2g3h4i5j6k7l';
 const RANGE = 'tabla_clientes_wp!A2';
 const WEB_PORT = process.env.PORT || 3000;
 const AUTH_FOLDER = 'auth_info_baileys';
@@ -47,7 +47,10 @@ function getGoogleCredentials() {
 function cleanAuthFolder() {
     if (fs.existsSync(AUTH_FOLDER)) {
         try {
-            fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
+            fs.rmSync(AUTH_FOLDER, {
+                recursive: true,
+                force: true
+            });
             console.log('🧹 Carpeta de autenticación limpiada');
         } catch (e) {
             console.error('⚠️ Error limpiando carpeta de auth:', e.message);
@@ -171,12 +174,16 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/qr', (req, res) => {
-    res.json({ qr: currentQR });
+    res.json({
+        qr: currentQR
+    });
 });
 
 // --- HEALTH CHECK PARA KOYEB ---
 app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok' });
+    res.status(200).json({
+        status: 'ok'
+    });
 });
 
 const server = app.listen(WEB_PORT, '0.0.0.0', () => {
