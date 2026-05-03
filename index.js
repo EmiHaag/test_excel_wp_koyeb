@@ -116,7 +116,7 @@ app.get('/', (req, res) => {
             async function fetchQR() {
                 attemptCount++;
                 try {
-                    const response = await fetch('http://localhost:${WEB_PORT}/api/qr', {
+                    const response = await fetch('/api/qr', {
                         method: 'GET',
                         headers: {
                             'Content-Type': 'application/json'
@@ -179,9 +179,9 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok' });
 });
 
-const server = app.listen(WEB_PORT, () => {
-    console.log(`🌐 Servidor web disponible en http://localhost:${WEB_PORT}`);
-    console.log(`💚 Health check disponible en http://localhost:${WEB_PORT}/health`);
+const server = app.listen(WEB_PORT, '0.0.0.0', () => {
+    console.log(`🌐 Servidor web disponible en puerto ${WEB_PORT}`);
+    console.log(`💚 Health check disponible en /${WEB_PORT}/health`);
 });
 
 // --- PERSISTENCIA LID ---
