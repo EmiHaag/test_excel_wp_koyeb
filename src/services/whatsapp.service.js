@@ -4,29 +4,50 @@ const {
     DisconnectReason,
     fetchLatestBaileysVersion
 } = require('@whiskeysockets/baileys');
-const { Boom } = require('@hapi/boom');
+const {
+    Boom
+} = require('@hapi/boom');
 const pino = require('pino');
 const sanitizeText = require('../utils/sanitize');
 const formatTimestamp = require('../utils/formatTimestamp');
-const { syncToSheet } = require('./sheets.service');
+const {
+    syncToSheet
+} = require('./sheets.service');
 
 async function startWhatsApp(config, state, services) {
-    const { authFolder, spreadsheetId, googleCredentials, autoResponseService, lidService } = config;
-    
-    const { state: authState, saveCreds } = await useMultiFileAuthState(authFolder);
-    const { version } = await fetchLatestBaileysVersion();
+    const {
+        authFolder,
+        spreadsheetId,
+        googleCredentials,
+        autoResponseService,
+        lidService
+    } = config;
+
+    const {
+        state: authState,
+        saveCreds
+    } = await useMultiFileAuthState(authFolder);
+    const {
+        version
+    } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
         version,
         auth: authState,
         printQRInTerminal: false,
         browser: ['Windows', 'Chrome', '110.0.5481.178'],
-        logger: pino({ level: 'silent' })
+        logger: pino({
+            level: 'silent'
+        })
     });
 
     sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update;
-        
+        const {
+            connection,
+            lastDisconnect,
+            qr
+        } = update;
+
         if (qr) {
             state.currentQR = qr;
         }
@@ -34,7 +55,7 @@ async function startWhatsApp(config, state, services) {
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error instanceof Boom) ?
                 lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut : true;
-            
+
             if (shouldReconnect) {
                 console.log('🔄 Reconectando WhatsApp...');
                 startWhatsApp(config, state, services);
@@ -80,11 +101,11 @@ async function startWhatsApp(config, state, services) {
                 } else {
                     try {
                         const results = await sock.onWhatsApp(senderJid);
-                        if (results && results.length > 0) {
-                            const result = results[0];
-                            if (result.exists && result.jid.endsWith('@s.whatsapp.net')) {
-                                lidService.set(senderJid, result.jid);
-                                senderJid = result.jid;
+                        if (Array.isArray(results) && results.length > 0 && results[0].jid) {
+                            const fullJid = results[0].jid;
+                            if (fullJid.endsWith('@s.whatsapp.net')) {
+                                lidService.set(senderJid, fullJid);
+                                senderJid = fullJid;
                             }
                         }
                     } catch (err) {
@@ -100,7 +121,7 @@ async function startWhatsApp(config, state, services) {
 
             const sanitizedMsg = sanitizeText(messageText);
             const dateStr = formatTimestamp(msg.messageTimestamp);
-            
+
             console.log(`📩 Mensaje de ${pushName} (${phone}): ${sanitizedMsg}`);
 
             await syncToSheet({
@@ -116,7 +137,9 @@ async function startWhatsApp(config, state, services) {
             if (match) {
                 await sock.sendPresenceUpdate('composing', jid);
                 setTimeout(async () => {
-                    await sock.sendMessage(jid, { text: match.reply });
+                    await sock.sendMessage(jid, {
+                        text: match.reply
+                    });
                     await sock.sendPresenceUpdate('paused', jid);
                 }, 5000);
             }
@@ -126,4 +149,6 @@ async function startWhatsApp(config, state, services) {
     return sock;
 }
 
-module.exports = { startWhatsApp };
+module.exports = {
+    startWhatsApp
+};
