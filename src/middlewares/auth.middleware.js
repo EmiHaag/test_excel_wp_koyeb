@@ -1,26 +1,35 @@
 /**
- * Middleware para autenticación básica HTTP.
- * Utiliza las variables de entorno QR_USER y QR_PASS.
+ * Middleware para autenticación básica HTTP con tiempo de sesión.
  */
 module.exports = (req, res, next) => {
     const QR_USER = process.env.QR_USER;
     const QR_PASS = process.env.QR_PASS;
 
-    // Si no están configuradas las credenciales, bloqueamos por seguridad
-    // o podrías optar por dejar pasar si estás en desarrollo.
     if (!QR_USER || !QR_PASS) {
-        console.warn('⚠️ QR_USER o QR_PASS no configurados. Acceso denegado por defecto.');
+        console.warn('⚠️ QR_USER o QR_PASS no configurados.');
         return res.status(500).send('Configuración de seguridad incompleta.');
     }
 
-    const auth = { login: QR_USER, password: QR_PASS };
-    const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
+    // Generamos un "Reino" que cambia cada 2 minutos (120000ms)
+    // Esto fuerza al navegador a pedir la contraseña de nuevo cuando el periodo cambia.
+    const sessionWindow = Math.floor(Date.now() / 120000); 
+    const realm = `QR Access ${sessionWindow}`;
+
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+        res.set('WWW-Authenticate', `Basic realm="${realm}"`);
+        return res.status(401).send('Autenticación requerida.');
+    }
+
+    const b64auth = authHeader.split(' ')[1] || '';
     const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
 
-    if (login && password && login === auth.login && password === auth.password) {
+    if (login === QR_USER && password === QR_PASS) {
         return next();
     }
 
-    res.set('WWW-Authenticate', 'Basic realm="QR Access"');
-    res.status(401).send('Autenticación requerida.');
+    // Si fallan las credenciales, volvemos a pedir
+    res.set('WWW-Authenticate', `Basic realm="${realm}"`);
+    return res.status(401).send('Credenciales incorrectas.');
 };
