@@ -326,12 +326,8 @@ async function startWhatsApp() {
             lastDisconnect,
             qr
         } = update;
-        console.log(`[CONNECTION UPDATE] connection=${connection}, qr=${qr ? 'YES' : 'NO'}`);
         if (qr) {
             currentQR = qr;
-            qrcode.generate(qr, { small: true });
-            console.log(`📲 Código QR disponible en http://localhost:${WEB_PORT}`);
-            console.log(`[DEBUG] currentQR establecido, longitud: ${qr.length}`);
         }
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error instanceof Boom) ?
