@@ -29,7 +29,7 @@ const state = {
 // Obtener credenciales de Google
 function getGoogleCredentials() {
     let credsRaw = process.env.CREDENTIALS_JSON;
-    
+
     if (credsRaw) {
         try {
             // Si la cadena viene envuelta en comillas por el archivo .env, las quitamos
@@ -38,7 +38,7 @@ function getGoogleCredentials() {
             } else if (credsRaw.startsWith('"') && credsRaw.endsWith('"')) {
                 credsRaw = credsRaw.slice(1, -1);
             }
-            
+
             return JSON.parse(credsRaw);
         } catch (e) {
             console.error('❌ Error parseando CREDENTIALS_JSON. Asegúrate de que sea un JSON válido en una sola línea.');

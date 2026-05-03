@@ -1,4 +1,6 @@
-const { google } = require('googleapis');
+const {
+    google
+} = require('googleapis');
 const path = require('path');
 const fs = require('fs');
 
@@ -30,11 +32,15 @@ class AutoResponseService {
                 scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
             });
 
-            const sheets = google.sheets({ version: 'v4', auth });
-            console.log(`🔍 [AutoResponse] Consultando rango respuestas_bot!A1:Z`);
+            const sheets = google.sheets({
+                version: 'v4',
+                auth
+            });
+            const sheetName = process.env.NOMBRE_SHEET_RESPUESTAS_BOT || 'respuestas_bot';
+            console.log(`🔍 [AutoResponse] Consultando rango ${sheetName}!A1:Z`);
             const response = await sheets.spreadsheets.values.get({
                 spreadsheetId: this.spreadsheetId,
-                range: 'respuestas_bot!A1:Z',
+                range: `${sheetName}!A1:Z`,
             });
 
             const rows = response.data.values;
@@ -44,33 +50,36 @@ class AutoResponseService {
                 this.responsesCache = [];
             } else {
                 const headers = rows[0].map(h => h.toLowerCase().trim());
-                const keywordIdx = headers.indexOf('palabra_clave');
-                const responseIdx = headers.indexOf('respuesta');
+                const col1Name = (process.env.NOMBRE_COL_1_RESPUESTAS_BOT || 'palabras clave').toLowerCase();
+                const col2Name = (process.env.NOMBRE_COL_2_RESPUESTAS_BOT || 'respuesta').toLowerCase();
+                const col3Name = (process.env.NOMBRE_COL_3_RESPUESTAS_BOT || 'sector').toLowerCase();
+
+                const keywordIdx = headers.indexOf(col1Name);
+                const responseIdx = headers.indexOf(col2Name);
+                const extraIdx = headers.indexOf(col3Name);
 
                 if (keywordIdx === -1 || responseIdx === -1) {
-                    console.error('❌ No se encontraron las columnas "palabra_clave" o "respuesta" en la hoja "respuestas_bot"');
+                    console.error(`❌ No se encontraron las columnas "${col1Name}" o "${col2Name}" en la hoja`);
                     console.log('Encabezados encontrados:', headers);
                     this.responsesCache = [];
                 } else {
                     this.responsesCache = rows.slice(1).map(row => {
                         const rawKeywords = row[keywordIdx] || '';
-                        // Dividir por comas, slashes o múltiples espacios, y limpiar
                         const keywords = rawKeywords
-                            .split(/[,/\s]+/) // Regex para uno o más de: , / o espacio
+                            .split(/[,/\s]+/)
                             .map(k => k.toLowerCase().trim())
-                            .filter(k => k.length > 1); // Ignorar letras sueltas o vacíos
-                        
+                            .filter(k => k.length > 1);
+
+                        const extraInfo = extraIdx !== -1 ? (row[extraIdx] || '').trim() : '';
+
                         return {
                             keywords,
-                            reply: row[responseIdx]
+                            reply: row[responseIdx],
+                            extraInfo
                         };
                     }).filter(item => item.keywords.length > 0 && item.reply);
 
                     console.log(`✅ ${this.responsesCache.length} respuestas automáticas cargadas.`);
-                    if (this.responsesCache.length > 0) {
-                        const allKeys = this.responsesCache.flatMap(r => r.keywords);
-                        console.log('Palabras clave registradas:', allKeys.join(', '));
-                    }
                 }
             }
 
@@ -78,32 +87,61 @@ class AutoResponseService {
             return this.responsesCache;
         } catch (error) {
             console.error('❌ [AutoResponse] Error al obtener respuestas:', error.message);
-            console.error('Stack:', error.stack);
             return this.responsesCache || [];
         }
     }
 
     async findMatch(messageText) {
         const responses = await this.getResponses();
-        const text = messageText.toLowerCase();
+        
+        // Limpiamos y separamos el mensaje del usuario en palabras individuales
+        const messageWords = messageText.toLowerCase()
+            .split(/[^a-z0-9áéíóúñ]+/) // Separar por cualquier cosa que no sea letra o número
+            .filter(w => w.length > 1);
 
-        console.log(`🔎 [AutoResponse] Buscando match en ${responses.length} respuestas. Texto: "${text}"`);
+        console.log(`🔎 [AutoResponse] Analizando palabras del mensaje: ${messageWords.join(', ')}`);
 
-        const match = responses.find(item =>
-            item.keywords.some(keyword => {
-                const found = text.includes(keyword);
-                if (found) console.log(`   ✅ Match encontrado: "${keyword}"`);
-                return found;
-            })
-        );
+        // Evaluamos cada respuesta de la tabla
+        const matches = responses.map(item => {
+            // Contamos cuántas palabras del mensaje coinciden con los keywords de esta fila
+            const matchedWords = messageWords.filter(word => 
+                item.keywords.some(kw => word.includes(kw) || kw.includes(word))
+            );
+            
+            // Eliminamos duplicados de palabras que hayan coincidido
+            const uniqueMatches = [...new Set(matchedWords)];
+            
+            return { 
+                ...item, 
+                matchCount: uniqueMatches.length,
+                // Densidad: qué tan bien cubre este tag el total de keywords de la fila
+                score: uniqueMatches.length / item.keywords.length 
+            };
+        }).filter(item => item.matchCount > 0);
 
-        if (match) {
-            console.log(`✨ [AutoResponse] Respuesta encontrada: "${match.reply.substring(0, 50)}..."`);
-        } else {
+        if (matches.length === 0) {
             console.log(`🔇 [AutoResponse] Sin respuesta automática para este mensaje`);
+            return null;
         }
 
-        return match;
+        // Ordenamos por relevancia (matchCount) y luego especificidad (score)
+        matches.sort((a, b) => {
+            if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
+            return b.score - a.score;
+        });
+        
+        const bestMatch = matches[0];
+        
+        // Agregar la columna 3 (extraInfo) entre paréntesis si existe
+        let finalReply = bestMatch.reply;
+        if (bestMatch.extraInfo) {
+            finalReply = `${finalReply} (${bestMatch.extraInfo})`;
+        }
+
+        console.log(`   ✅ Match encontrado (${bestMatch.matchCount} aciertos): "${bestMatch.keywords.join(', ')}"`);
+        console.log(`✨ [AutoResponse] Respuesta final: "${finalReply.substring(0, 50)}..."`);
+
+        return { ...bestMatch, reply: finalReply };
     }
 }
 
