@@ -103,9 +103,9 @@ class AutoResponseService {
 
         // Evaluamos cada respuesta de la tabla
         const matches = responses.map(item => {
-            // Contamos cuántas palabras del mensaje coinciden con los keywords de esta fila
+            // Contamos cuántas palabras del mensaje coinciden exactamente con los keywords de esta fila
             const matchedWords = messageWords.filter(word => 
-                item.keywords.some(kw => word.includes(kw) || kw.includes(word))
+                item.keywords.some(kw => word === kw)
             );
             
             // Eliminamos duplicados de palabras que hayan coincidido
