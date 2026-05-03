@@ -3,9 +3,9 @@ const path = require('path');
 const fs = require('fs');
 
 class AutoResponseService {
-    constructor(spreadsheetId, credentialsPath) {
+    constructor(spreadsheetId, credentials) {
         this.spreadsheetId = spreadsheetId;
-        this.credentialsPath = credentialsPath;
+        this.credentials = credentials;
         this.responsesCache = null;
         this.lastFetch = 0;
         this.cacheDuration = 60000; // 1 minuto de cache
@@ -20,17 +20,15 @@ class AutoResponseService {
 
         try {
             console.log(`📡 [AutoResponse] Leyendo respuestas de Google Sheets...`);
-            let credentialsJson = process.env.CREDENTIALS_JSON;
-            if (!credentialsJson && fs.existsSync(this.credentialsPath)) {
-                credentialsJson = fs.readFileSync(this.credentialsPath, 'utf-8');
+
+            if (!this.credentials) {
+                throw new Error("Credentials not configured. Set GOOGLE_CREDENTIALS environment variable or ensure credentials.json exists");
             }
-            if (!credentialsJson) {
-                throw new Error("CREDENTIALS_JSON not found. Set env var or create credentials.json");
-            }
-        const auth = new google.auth.GoogleAuth({
-            credentials: JSON.parse(credentialsJson),
-            scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-        });
+
+            const auth = new google.auth.GoogleAuth({
+                credentials: this.credentials,
+                scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+            });
 
             const sheets = google.sheets({ version: 'v4', auth });
             console.log(`🔍 [AutoResponse] Consultando rango respuestas_bot!A1:Z`);
