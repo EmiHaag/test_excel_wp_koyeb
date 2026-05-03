@@ -72,12 +72,15 @@ async function startWhatsApp(config, state, services) {
     sock.ws.on('CB:message', (node) => {
         const from = node.attrs.from;
         if (from && from.endsWith('@lid')) {
+            // Normalizar LID: quitar sufijos tipo :14
+            const cleanLid = from.split(':')[0].split('@')[0] + '@lid';
+            
             const potentialPn = node.attrs.actual_pn || node.attrs.sender_pn || node.attrs.phash || node.attrs.pn;
             if (potentialPn) {
                 const jidPn = potentialPn.includes('@') ? potentialPn : `${potentialPn}@s.whatsapp.net`;
-                if (!lidService.get(from)) {
-                    console.log(`🔍 [LID Mapping] ¡Mapeo ENCONTRADO!: ${from} -> ${jidPn}`);
-                    lidService.set(from, jidPn);
+                if (!lidService.get(cleanLid)) {
+                    console.log(`🔍 [LID Mapping] ¡Mapeo ENCONTRADO!: ${cleanLid} -> ${jidPn}`);
+                    lidService.set(cleanLid, jidPn);
                 }
             }
         }
@@ -93,9 +96,11 @@ async function startWhatsApp(config, state, services) {
             const participant = msg.key.participant;
             let senderJid = participant || jid;
 
-            // Resolución LID -> PN
+            // Resolución LID -> PN con Normalización
             if (senderJid.endsWith('@lid')) {
-                const cachedJid = lidService.get(senderJid);
+                const cleanSenderLid = senderJid.split(':')[0].split('@')[0] + '@lid';
+                const cachedJid = lidService.get(cleanSenderLid);
+                
                 if (cachedJid) {
                     senderJid = cachedJid;
                 } else {
@@ -104,7 +109,7 @@ async function startWhatsApp(config, state, services) {
                         if (Array.isArray(results) && results.length > 0 && results[0].jid) {
                             const fullJid = results[0].jid;
                             if (fullJid.endsWith('@s.whatsapp.net')) {
-                                lidService.set(senderJid, fullJid);
+                                lidService.set(cleanSenderLid, fullJid);
                                 senderJid = fullJid;
                             }
                         }
