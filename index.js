@@ -209,13 +209,22 @@ async function syncToSheet({ dateStr, pushName, phone, sanitizedMsg }) {
 }
 
 // --- WHATSAPP CLIENT ---
+const getPuppeteerConfig = () => {
+    const isWindows = process.platform === 'win32';
+    const executablePath = isWindows
+        ? process.env.BROWSER_PATH || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+        : process.env.BROWSER_PATH || '/usr/bin/chromium';
+
+    return {
+        headless: true,
+        executablePath,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    };
+};
+
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: AUTH_DIR }),
-    puppeteer: {
-        headless: true,
-        executablePath: process.env.BROWSER_PATH || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    }
+    puppeteer: getPuppeteerConfig()
 });
 
 client.on('qr', (qr) => {

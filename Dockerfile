@@ -1,15 +1,20 @@
-FROM node:20-alpine
+FROM node:20-slim
 
-WORKDIR /usr/src/app
+RUN apt-get update && apt-get install -y \
+    chromium \
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copiar los archivos de dependencias
+WORKDIR /app
+
 COPY package*.json ./
+RUN npm install
 
-# Instalar las dependencias de producción
-RUN npm ci --only=production
-
-# Copiar el resto del código
 COPY . .
 
-# Comando de inicio (ajusta según tu archivo principal, ej: index.js o app.js)
-CMD [ "node", "index.js" ]
+ENV BROWSER_PATH=/usr/bin/chromium
+ENV NODE_ENV=production
+
+EXPOSE 8000
+
+CMD ["npm", "start"]
