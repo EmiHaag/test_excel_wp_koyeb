@@ -8,6 +8,7 @@ build/
 # Ignore logs
 logs/
 *.log
+*.txt
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -37,3 +38,4 @@ auth_info_baileys/
 # Ignore any other temporary or generated files
 temp/
 *.tmp
+*.old
