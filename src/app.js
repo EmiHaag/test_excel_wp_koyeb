@@ -6,9 +6,6 @@ const qrRoutes = require('./routes/qr.routes');
 function createApp(state) {
     const app = express();
 
-    // Configuración para túneles y proxies
-    app.set('trust proxy', true);
-
     app.use(express.static('public'));
     app.use(express.json());
 

@@ -14,6 +14,13 @@ const WEB_PORT = process.env.PORT || 3000;
 const AUTH_FOLDER = 'auth_info_baileys';
 const LID_MAP_PATH = path.join(__dirname, '..', 'lid_map.json');
 
+// Validación de configuración crítica
+if (!SPREADSHEET_ID) {
+    console.error('❌ ERROR: La variable SHEET_ID no está definida en el archivo .env');
+} else {
+    console.log(`📊 Spreadsheet ID cargado: ${SPREADSHEET_ID.substring(0, 5)}...${SPREADSHEET_ID.substring(SPREADSHEET_ID.length - 5)}`);
+}
+
 // Estado compartido
 const state = {
     currentQR: null
@@ -21,11 +28,21 @@ const state = {
 
 // Obtener credenciales de Google
 function getGoogleCredentials() {
-    if (process.env.CREDENTIALS_JSON) {
+    let credsRaw = process.env.CREDENTIALS_JSON;
+    
+    if (credsRaw) {
         try {
-            return JSON.parse(process.env.CREDENTIALS_JSON);
+            // Si la cadena viene envuelta en comillas por el archivo .env, las quitamos
+            if (credsRaw.startsWith("'") && credsRaw.endsWith("'")) {
+                credsRaw = credsRaw.slice(1, -1);
+            } else if (credsRaw.startsWith('"') && credsRaw.endsWith('"')) {
+                credsRaw = credsRaw.slice(1, -1);
+            }
+            
+            return JSON.parse(credsRaw);
         } catch (e) {
-            console.error('❌ Error parseando CREDENTIALS_JSON');
+            console.error('❌ Error parseando CREDENTIALS_JSON. Asegúrate de que sea un JSON válido en una sola línea.');
+            console.error('Error detalle:', e.message);
             return null;
         }
     }

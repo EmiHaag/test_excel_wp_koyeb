@@ -52,8 +52,8 @@ module.exports = (state) => {
                 async function fetchQR() {
                     attemptCount++;
                     try {
-                        // Importante: fetch a /qr/api, manteniendo la ruta relativa
-                        const response = await fetch('./qr/api', {
+                        // Usamos la ruta absoluta desde la raíz para mayor compatibilidad
+                        const response = await fetch('/qr/api', {
                             method: 'GET',
                             headers: {
                                 'Content-Type': 'application/json'
