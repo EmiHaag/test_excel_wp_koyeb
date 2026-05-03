@@ -178,6 +178,16 @@ const server = app.listen(WEB_PORT, () => {
     console.log(`🌐 Servidor web disponible en http://localhost:${WEB_PORT}`);
 });
 
+// --- HEALTH CHECK PARA KOYEB ---
+const healthApp = express();
+healthApp.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
+
+const healthServer = healthApp.listen(8000, () => {
+    console.log(`💚 Health check disponible en http://localhost:8000/health`);
+});
+
 // --- PERSISTENCIA LID ---
 function loadLidMap() {
     if (fs.existsSync(LID_MAP_PATH)) {
