@@ -7,11 +7,9 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "^7.0.0-rc.9",
-    "googleapis": "^126.0.0",
-    "pino": "^8.16.1",
+    "whatsapp-web.js": "^1.24.0",
     "qrcode": "^1.5.4",
-    "qrcode-terminal": "^0.12.0"
+    "googleapis": "^126.0.0"
   },
   "engines": {
     "node": ">=20.0.0"

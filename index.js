@@ -1,59 +1,37 @@
-const {
-    default: makeWASocket,
-    useMultiFileAuthState,
-    DisconnectReason,
-    fetchLatestBaileysVersion
-} = require('@whiskeysockets/baileys');
-const {
-    Boom
-} = require('@hapi/boom');
-const {
-    google
-} = require('googleapis');
-const qrcode = require('qrcode-terminal');
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const { google } = require('googleapis');
 const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 const AutoResponseService = require('./autoResponse');
 
 // --- CONFIGURACIÓN ---
 const SPREADSHEET_ID = '11pp2Hna3pWmBK5t82m9ymIFPce-aD3HZmI00pgaLEDo';
-const RANGE = 'tabla_clientes_wp!A2';
 const CREDENTIALS_PATH = path.join(__dirname, 'credentials.json');
 const LID_MAP_PATH = path.join(__dirname, 'lid_map.json');
-const AUTH_DIR = path.join(__dirname, 'auth_info'); // Adaptado para el volumen
+const AUTH_DIR = path.join(__dirname, 'auth_info');
 
-const http = require('http');
-
-global.latestQR = null; // Variable global para guardar el QR temporalmente en memoria
-
-// --- HTTP Server for Health Check y Web QR ---
+global.latestQR = null;
 const PORT = process.env.PORT || 8000;
 
+// --- HTTP Server for Health Check y Web QR ---
 const server = http.createServer(async (req, res) => {
-    // Normalizamos la URL usando el host de la petición
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
     let pathname = parsedUrl.pathname;
 
-
-    // Removemos la barra diagonal al final si existe (ej: /health/ -> /health)
     if (pathname.endsWith('/') && pathname.length > 1) {
         pathname = pathname.slice(0, -1);
     }
 
     if (pathname === '/health') {
-        res.writeHead(200, {
-            'Content-Type': 'text/plain'
-        });
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('OK');
     } else if (pathname === '/qr') {
         if (typeof global.latestQR !== 'undefined' && global.latestQR) {
             try {
                 const qrImage = await QRCode.toDataURL(global.latestQR);
-
-                res.writeHead(200, {
-                    'Content-Type': 'text/html'
-                });
+                res.writeHead(200, { 'Content-Type': 'text/html' });
                 res.end(`
                     <!DOCTYPE html>
                     <html lang="es">
@@ -99,15 +77,11 @@ const server = http.createServer(async (req, res) => {
                     </html>
                 `);
             } catch (error) {
-                res.writeHead(500, {
-                    'Content-Type': 'text/plain'
-                });
+                res.writeHead(500, { 'Content-Type': 'text/plain' });
                 res.end('Error interno al generar la imagen QR.');
             }
         } else {
-            res.writeHead(404, {
-                'Content-Type': 'text/html'
-            });
+            res.writeHead(404, { 'Content-Type': 'text/html' });
             res.end(`
                 <html lang="es">
                 <body style="background:#111827;color:#fff;font-family:sans-serif;text-align:center;padding-top:20%;">
@@ -118,9 +92,7 @@ const server = http.createServer(async (req, res) => {
             `);
         }
     } else {
-        res.writeHead(404, {
-            'Content-Type': 'text/plain'
-        });
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('Not Found');
     }
 });
@@ -130,33 +102,6 @@ server.listen(PORT, '0.0.0.0', () => {
 });
 
 const autoResponseService = new AutoResponseService(SPREADSHEET_ID, CREDENTIALS_PATH);
-
-
-async function createSocket() {
-    const {
-        state,
-        saveCreds
-    } = await useMultiFileAuthState(AUTH_DIR);
-
-    const sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: false,
-        browser: ['Windows', 'Chrome', '120.0.0.0'],
-        connectTimeoutMs: 90000,
-        defaultQueryTimeoutMs: 60000,
-        keepAliveIntervalMs: 25000,
-        logger: require('pino')({
-            level: 'error'
-        }),
-        qrTimeout: 60000,
-        retryRequestDelayMs: 250
-    });
-
-    sock.ev.on('creds.update', saveCreds);
-    return sock;
-}
-
-
 
 // --- PERSISTENCIA LID ---
 function loadLidMap() {
@@ -179,7 +124,7 @@ let lidMap = loadLidMap();
 // --- UTILIDADES ---
 function sanitizeText(text) {
     if (!text) return '';
-    return text.replace(/[^\x20-\x7E\u00A0-\u00FF\u0100-\u017F\u0180-\u024F\u1E00-\u1EFF]/g, '').trim();
+    return text.replace(/[^\x20-\x7E -ÿĀ-ſƀ-ɏḀ-ỿ]/g, '').trim();
 }
 
 function formatTimestamp(timestamp) {
@@ -193,25 +138,20 @@ function formatTimestamp(timestamp) {
 }
 
 // --- GOOGLE SHEETS ---
-async function syncToSheet({
-    dateStr,
-    pushName,
-    phone,
-    sanitizedMsg
-}) {
+async function syncToSheet({ dateStr, pushName, phone, sanitizedMsg }) {
     try {
-        const credentialsJson = process.env.CREDENTIALS_JSON;
+        let credentialsJson = process.env.CREDENTIALS_JSON;
+        if (!credentialsJson && fs.existsSync(CREDENTIALS_PATH)) {
+            credentialsJson = fs.readFileSync(CREDENTIALS_PATH, 'utf-8');
+        }
         if (!credentialsJson) {
-            throw new Error("CREDENTIALS_JSON environment variable not set. Please provide Google Cloud credentials.");
+            throw new Error("CREDENTIALS_JSON not found. Set env var or create credentials.json");
         }
         const auth = new google.auth.GoogleAuth({
             credentials: JSON.parse(credentialsJson),
             scopes: ['https://www.googleapis.com/auth/spreadsheets'],
         });
-        const sheets = google.sheets({
-            version: 'v4',
-            auth
-        });
+        const sheets = google.sheets({ version: 'v4', auth });
 
         const rangeRead = 'tabla_clientes_wp!A1:D';
         const response = await sheets.spreadsheets.values.get({
@@ -247,9 +187,7 @@ async function syncToSheet({
                 range: `tabla_clientes_wp!A${realRow}:D${realRow}`,
                 valueInputOption: 'USER_ENTERED',
                 resource: {
-                    values: [
-                        [dateStr, pushName, phone, newMsg]
-                    ]
+                    values: [[dateStr, pushName, phone, newMsg]]
                 },
             });
             console.log(`📝 Fila ${realRow} actualizada.`);
@@ -260,9 +198,7 @@ async function syncToSheet({
                 range: `tabla_clientes_wp!A${targetRow}:D${targetRow}`,
                 valueInputOption: 'USER_ENTERED',
                 resource: {
-                    values: [
-                        [dateStr, pushName, phone, sanitizedMsg]
-                    ]
+                    values: [[dateStr, pushName, phone, sanitizedMsg]]
                 },
             });
             console.log(`✅ Nuevo cliente en fila ${targetRow}.`);
@@ -272,191 +208,73 @@ async function syncToSheet({
     }
 }
 
-// --- WHATSAPP ---
-async function startWhatsApp() {
-    console.log('🚀 Iniciando bot de WhatsApp...');
-    console.log(`📋 SpreadsheetID: ${SPREADSHEET_ID}`);
-    console.log(`📂 Credenciales: ${CREDENTIALS_PATH}`);
-
-    try {
-        // --- LIMPIEZA DE SESIÓN (Plan eMicro) ---
-        // Eliminamos el directorio de sesión al arrancar para forzar una nueva vinculación
-        if (fs.existsSync(AUTH_DIR)) {
-            fs.rmSync(AUTH_DIR, {
-                recursive: true,
-                force: true
-            });
-            console.log('🧹 Carpeta de sesión eliminada por inconsistencias en el handshake.');
-        }
-
-        // Aseguramos que el directorio esté creado y vacío
-        if (!fs.existsSync(AUTH_DIR)) {
-            fs.mkdirSync(AUTH_DIR, {
-                recursive: true
-            });
-        }
-
-        const {
-            state,
-            saveCreds
-        } = await useMultiFileAuthState(AUTH_DIR);
-        const sock = await createSocket();
-        console.log('✅ Socket de WhatsApp creado con configuración optimizada');
-
-        let hasRequestedCode = false; // Bandera para pedir el código una sola vez
-
-        sock.ev.on('connection.update', async (update) => {
-            const {
-                connection,
-                lastDisconnect,
-                qr
-            } = update;
-
-            if (qr) {
-                global.latestQR = qr;
-                console.log('📶 Nuevo código QR detectado y guardado en memoria.');
-            }
-
-            if (connection === 'open') {
-                console.log('🟢 ¡Conexión establecida exitosamente!');
-                global.latestQR = null;
-            } else if (connection === 'close') {
-                const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                console.log('⚠️ Conexión cerrada. Motivo:', lastDisconnect.error);
-                if (shouldReconnect) {
-                    setTimeout(() => startWhatsApp(), 5000);
-                }
-            } else if (connection === 'connecting') {
-                console.log('⏳ El bot está intentando conectar con WhatsApp...');
-            }
-        });
-
-        sock.ev.on('creds.update', () => {
-            console.log('💾 Credenciales actualizadas');
-            saveCreds();
-        });
-
-        // --- INTERCEPTOR DE NODOS CRUDOS ---
-        sock.ws.on('CB:message', (node) => {
-            const from = node.attrs.from;
-            if (from && from.endsWith('@lid')) {
-                console.log(`DEBUG [CB:message] Atributos del nodo:`, JSON.stringify(node.attrs, null, 2));
-                const potentialPn = node.attrs.actual_pn || node.attrs.sender_pn || node.attrs.phash || node.attrs.pn;
-
-                if (potentialPn) {
-                    const jidPn = potentialPn.includes('@') ? potentialPn : `${potentialPn}@s.whatsapp.net`;
-                    if (!lidMap[from]) {
-                        console.log(`🔍 [CB:message] ¡Mapeo ENCONTRADO!: ${from} -> ${jidPn}`);
-                        lidMap[from] = jidPn;
-                        saveLidMap(lidMap);
-                    }
-                }
-            }
-        });
-
-        sock.ev.on('messages.upsert', async (m) => {
-            console.log(`📬 messages.upsert: tipo=${m.type}, cantidad=${m.messages.length}`);
-            if (m.type !== 'notify') {
-                console.log(`⏭️  Ignorando tipo: ${m.type}`);
-                return;
-            }
-
-            for (const msg of m.messages) {
-                try {
-                    if (msg.key.fromMe) {
-                        console.log('🤖 Mensaje propio, ignorando');
-                        continue;
-                    }
-
-                    const jid = msg.key.remoteJid;
-                    const participant = msg.key.participant;
-                    let senderJid = participant || jid;
-
-                    // RESOLUCIÓN LID -> PN
-                    if (senderJid.endsWith('@lid')) {
-                        console.log(`🔍 [LID Detectado] Intentando resolver: ${senderJid}`);
-
-                        if (lidMap[senderJid]) {
-                            console.log(`📖 [LID Map] Usando caché: ${lidMap[senderJid]}`);
-                            senderJid = lidMap[senderJid];
-                        } else {
-                            try {
-                                console.log(`📡 [onWhatsApp] Consultando a servidores para: ${senderJid}...`);
-                                const results = await sock.onWhatsApp(senderJid);
-                                console.log(`📡 [onWhatsApp] Respuesta bruta:`, JSON.stringify(results, null, 2));
-
-                                if (results && results.length > 0) {
-                                    const result = results[0];
-                                    if (result.exists && result.jid.endsWith('@s.whatsapp.net')) {
-                                        console.log(`✅ [onWhatsApp] Resolución ÉXITO: ${senderJid} -> ${result.jid}`);
-                                        lidMap[senderJid] = result.jid;
-                                        saveLidMap(lidMap);
-                                        senderJid = result.jid;
-                                    }
-                                }
-                            } catch (err) {
-                                console.error('❌ [onWhatsApp] Error:', err.message);
-                            }
-                        }
-                    }
-
-                    const phone = senderJid.split('@')[0];
-                    const pushName = msg.pushName || 'Desconocido';
-                    let messageText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
-                    if (!messageText) {
-                        console.log('⏭️  Mensaje sin texto, ignorando');
-                        continue;
-                    }
-
-                    const sanitizedMsg = sanitizeText(messageText);
-                    const dateStr = formatTimestamp(msg.messageTimestamp);
-                    console.log(`📩 Mensaje de ${pushName} (${phone}): ${sanitizedMsg}`);
-
-                    await syncToSheet({
-                        dateStr,
-                        pushName,
-                        phone,
-                        sanitizedMsg
-                    });
-
-                    try {
-                        const match = await autoResponseService.findMatch(messageText);
-                        if (match) {
-                            console.log(`✅ Match encontrado, enviando respuesta...`);
-                            await sock.sendPresenceUpdate('composing', jid);
-                            setTimeout(async () => {
-                                try {
-                                    await sock.sendMessage(jid, {
-                                        text: match.reply
-                                    });
-                                    console.log(`✉️  Respuesta enviada a ${phone}`);
-                                    await sock.sendPresenceUpdate('paused', jid);
-                                } catch (err) {
-                                    console.error(`❌ Error enviando mensaje a ${phone}:`, err.message);
-                                }
-                            }, 5000);
-                        } else {
-                            console.log(`❌ No match para: ${sanitizedMsg}`);
-                        }
-                    } catch (err) {
-                        console.error(`❌ Error en findMatch:`, err.message);
-                    }
-                } catch (err) {
-                    console.error(`❌ Error procesando mensaje:`, err.message);
-                }
-            }
-        });
-
-    } catch (err) {
-        console.error(`❌ Error crítico al iniciar:`, err.message);
-        console.error(err.stack);
-        setTimeout(() => startWhatsApp(), 5000);
+// --- WHATSAPP CLIENT ---
+const client = new Client({
+    authStrategy: new LocalAuth({ dataPath: AUTH_DIR }),
+    puppeteer: {
+        headless: true,
+        executablePath: process.env.BROWSER_PATH || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     }
-}
+});
+
+client.on('qr', (qr) => {
+    global.latestQR = qr;
+    console.log('📶 Nuevo QR detectado y guardado en memoria.');
+});
+
+client.on('ready', () => {
+    console.log('🟢 ¡Cliente de WhatsApp conectado!');
+    global.latestQR = null;
+});
+
+client.on('message', async (msg) => {
+    try {
+        if (msg.fromMe) {
+            console.log('🤖 Mensaje propio, ignorando');
+            return;
+        }
+
+        const contact = await msg.getContact();
+        const phone = contact.number;
+        const pushName = contact.name || contact.pushname || 'Desconocido';
+        const sanitizedMsg = sanitizeText(msg.body);
+        const dateStr = formatTimestamp(Math.floor(Date.now() / 1000));
+
+        console.log(`📩 Mensaje de ${pushName} (${phone}): ${sanitizedMsg}`);
+
+        await syncToSheet({ dateStr, pushName, phone, sanitizedMsg });
+
+        try {
+            const match = await autoResponseService.findMatch(msg.body);
+            if (match) {
+                console.log(`✅ Match encontrado, enviando respuesta...`);
+                setTimeout(async () => {
+                    try {
+                        await msg.reply(match.reply);
+                        console.log(`✉️  Respuesta enviada a ${phone}`);
+                    } catch (err) {
+                        console.error(`❌ Error enviando mensaje a ${phone}:`, err.message);
+                    }
+                }, 5000);
+            } else {
+                console.log(`❌ No match para: ${sanitizedMsg}`);
+            }
+        } catch (err) {
+            console.error(`❌ Error en findMatch:`, err.message);
+        }
+    } catch (err) {
+        console.error(`❌ Error procesando mensaje:`, err.message);
+    }
+});
+
+client.on('disconnected', (reason) => {
+    console.log('⚠️ Cliente desconectado:', reason);
+});
+
+client.initialize().catch(err => {
+    console.error('❌ Error crítico:', err.message);
+    setTimeout(() => process.exit(1), 5000);
+});
 
 console.log('⏱️  ' + new Date().toLocaleString('es-AR'));
-startWhatsApp().catch(err => {
-    console.error("❌ Error crítico:", err.message);
-    console.error(err.stack);
-    setTimeout(() => startWhatsApp(), 5000);
-});

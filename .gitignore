@@ -27,6 +27,8 @@ Thumbs.db
 
 # Specific files to ignore for this project
 credentials.json
+.wwebjs_cache/
+auth_info/
 lid_map.json
 auth_info_baileys/
 *.lock
