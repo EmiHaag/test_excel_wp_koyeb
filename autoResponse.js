@@ -1,5 +1,6 @@
 const { google } = require('googleapis');
 const path = require('path');
+const fs = require('fs');
 
 class AutoResponseService {
     constructor(spreadsheetId, credentialsPath) {
@@ -19,10 +20,13 @@ class AutoResponseService {
 
         try {
             console.log(`📡 [AutoResponse] Leyendo respuestas de Google Sheets...`);
-                    const credentialsJson = process.env.CREDENTIALS_JSON;
-        if (!credentialsJson) {
-            throw new Error("CREDENTIALS_JSON environment variable not set. Please provide Google Cloud credentials.");
-        }
+            let credentialsJson = process.env.CREDENTIALS_JSON;
+            if (!credentialsJson && fs.existsSync(this.credentialsPath)) {
+                credentialsJson = fs.readFileSync(this.credentialsPath, 'utf-8');
+            }
+            if (!credentialsJson) {
+                throw new Error("CREDENTIALS_JSON not found. Set env var or create credentials.json");
+            }
         const auth = new google.auth.GoogleAuth({
             credentials: JSON.parse(credentialsJson),
             scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
