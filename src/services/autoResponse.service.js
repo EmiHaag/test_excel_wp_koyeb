@@ -94,12 +94,12 @@ class AutoResponseService {
 
     async findMatch(messageText) {
         const responses = await this.getResponses();
-        
+
         // Limpiamos y separamos el mensaje del usuario en palabras individuales
         // El regex [^a-z0-9áéíóúñ]+ separa por cualquier cosa que NO sea letra o número
         // Esto separa automáticamente "pim?" en ["pim"]
         const messageWords = messageText.toLowerCase()
-            .split(/[^a-z0-9áéíóúñ]+/) 
+            .split(/[^a-z0-9áéíóúñ]+/)
             .map(w => w.trim())
             .filter(w => w.length > 1);
 
@@ -108,21 +108,29 @@ class AutoResponseService {
         // Evaluamos cada respuesta de la tabla
         const matches = responses.map(item => {
             // Contamos cuántas palabras del mensaje coinciden exactamente con los keywords de esta fila
-            const matchedWords = messageWords.filter(word => 
+            const matchedWords = messageWords.filter(word =>
                 item.keywords.some(kw => word === kw.toLowerCase().replace(/[^a-z0-9áéíóúñ]/g, ''))
             );
-            
+
             const uniqueMatches = [...new Set(matchedWords)];
-            
-            return { 
-                ...item, 
+
+            return {
+                ...item,
                 matchCount: uniqueMatches.length,
-                score: uniqueMatches.length / item.keywords.length 
+                score: uniqueMatches.length / item.keywords.length
             };
         }).filter(item => item.matchCount > 0);
 
         if (matches.length === 0) {
             console.log(`🔇 [AutoResponse] Sin respuesta automática para este mensaje`);
+
+            if (process.env.RESPUESTA_DEFAULT === 'true') {
+                console.log(`✨ [AutoResponse] Enviando respuesta por defecto`);
+                return {
+                    reply: "No encontré nada con lo que me solicitás, pero voy a tomar nota para el futuro 🤓 (Recordá que no soy una IA, solo un bot buscando en una base de datos.. )  "
+                };
+            }
+
             return null;
         }
 
@@ -130,10 +138,22 @@ class AutoResponseService {
             if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
             return b.score - a.score;
         });
-        
+
         const bestMatch = matches[0];
-        
+
         let finalReply = String(bestMatch.reply).trim();
+
+        if (process.env.RESPUESTA_CON_TAGS_NO_ENCONTRADOS === 'true' && bestMatch.keywords.length > 0) {
+            // Buscamos cuál de las keywords del item fue la que matcheó
+            const matchedKeyword = bestMatch.keywords.find(kw =>
+                messageWords.some(word => word === kw.toLowerCase().replace(/[^a-z0-9áéíóúñ]/g, ''))
+            );
+
+            if (matchedKeyword) {
+                finalReply = `Mi búsqueda encontró este resultado con esta palabra clave que me diste *${matchedKeyword}*. ${finalReply}`;
+            }
+        }
+
         if (bestMatch.extraInfo && bestMatch.extraInfo !== '') {
             finalReply = `${finalReply} (${bestMatch.extraInfo})`;
             console.log(`   📎 Agregando info extra: "${bestMatch.extraInfo}"`);
@@ -142,7 +162,10 @@ class AutoResponseService {
         console.log(`   ✅ Match encontrado (${bestMatch.matchCount} aciertos): "${bestMatch.keywords.join(', ')}"`);
         console.log(`✨ [AutoResponse] Respuesta final: "${finalReply}"`);
 
-        return { ...bestMatch, reply: finalReply };
+        return {
+            ...bestMatch,
+            reply: finalReply
+        };
     }
 }
 
